@@ -1,0 +1,22 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Project Folders
+__pycache__/
+node_modules/
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+
+# Temp files
+*.log
+*.tmp
+*.bak
