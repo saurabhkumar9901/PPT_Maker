@@ -1,0 +1,12 @@
+{
+  "name": "ppt-compiler",
+  "version": "1.0.0",
+  "description": "Stage 3 - Compile design tokens + UI plan into .pptx via pptxgenjs",
+  "type": "module",
+  "scripts": {
+    "compile": "node compiler.mjs"
+  },
+  "dependencies": {
+    "pptxgenjs": "^3.12.0"
+  }
+}
