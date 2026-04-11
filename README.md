@@ -8,6 +8,15 @@ PPT Maker v2 is a robust, autonomous presentation generation engine that bridges
 
 The system operates across a strict 3-stage pipeline architecture to decouple content processing from visual rendering:
 
+```mermaid
+graph TD
+    A[Markdown File] -->|Raw Text| C(Gemini Orchestrator)
+    B[Slide Master .pptx] -->|Extract| D(Template Tokens)
+    C -->|ui_plan.json| E{Python-PPTX Compiler}
+    D -->|design_tokens.json| E
+    E -->|Renders Geometries & Constraints| F[Final Corporate .pptx]
+```
+
 ### 1. Stage 1: Ingestion (`ingest.py`)
 The pipeline begins by loading the target corporate **Slide Master `.pptx`** template. It autonomously extracts critical design "tokens" (primary and accent colors, typography maps, bounding box dimensions, and geometric coordinates) mathematically scaling them into a flexible `design_tokens.json`.
 
