@@ -23,6 +23,8 @@ load_dotenv()
 from ingest import ingest as run_ingest
 from orchestrator import plan_presentation as run_orchestrate
 from compiler import compile_presentation as run_compile
+from validator import validate_presentation, print_validation_report
+from editor import get_inventory, print_inventory, replace_text, reorder_slides
 
 
 # ─── Full Pipeline ────────────────────────────────────────────────────────────
@@ -52,6 +54,18 @@ def generate_presentation(markdown_path: str, template_path: str, output_path: s
     print("STAGE 3: COMPILATION")
     print("=" * 60)
     run_compile(tokens_path, plan_path, template_path, output_path)
+
+    # Stage 4: Validate
+    print("\n" + "=" * 60)
+    print("STAGE 4: VALIDATION")
+    print("=" * 60)
+    
+    with open(tokens_path, 'r', encoding='utf-8') as f:
+        import json
+        tokens = json.load(f)
+        
+    report = validate_presentation(output_path, tokens)
+    print_validation_report(report)
 
     return f"Presentation generated at: {output_path}"
 
@@ -152,6 +166,15 @@ Examples:
     comp_parser.add_argument("--plan", required=True, help="Path to ui_plan.json")
     comp_parser.add_argument("--template", required=True, help="Path to the original .pptx template")
     comp_parser.add_argument("--output", required=True, help="Path to output .pptx file")
+    comp_parser.add_argument("--no-validate", action="store_true", help="Skip post-generation validation")
+
+    # Editor Mode
+    edit_parser = subparsers.add_parser("edit", help="Surgical edits to an existing presentation")
+    edit_parser.add_argument("--pptx", required=True, help="Path to the .pptx file")
+    edit_parser.add_argument("--inventory", action="store_true", help="List all text shapes")
+    edit_parser.add_argument("--replace", help="JSON string: {\"slide\": 3, \"old\": \"...\", \"new\": \"...\"}")
+    edit_parser.add_argument("--reorder", help="Comma-separated 0-indexed slide order")
+    edit_parser.add_argument("--output", help="Output path (default: overwrite input)")
 
     # MCP Server
     subparsers.add_parser("serve", help="Start FastMCP server")
@@ -171,6 +194,27 @@ Examples:
 
     elif args.command == "compile":
         run_compile(args.tokens, args.plan, args.template, args.output)
+        if not args.no_validate:
+            import json
+            with open(args.tokens, 'r', encoding='utf-8') as f:
+                tokens = json.load(f)
+            report = validate_presentation(args.output, tokens)
+            print_validation_report(report)
+            
+    elif args.command == "edit":
+        if args.inventory:
+            inv = get_inventory(args.pptx)
+            print_inventory(inv)
+        elif args.replace:
+            import json
+            repl = json.loads(args.replace)
+            if isinstance(repl, dict): repl = [repl]
+            res = replace_text(args.pptx, repl, args.output)
+            print(f"Replaced {res['total_replacements']} occurrences. Saved to {res['output_path']}")
+        elif args.reorder:
+            order = [int(x.strip()) for x in args.reorder.split(',')]
+            out = reorder_slides(args.pptx, order, args.output)
+            print(f"Slides reordered. Saved to {out}")
 
     elif args.command == "serve":
         start_mcp_server()

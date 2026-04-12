@@ -1,5 +1,5 @@
 {
-  "template_name": "Template_AI Bubble_ Detection, Prevention, and Investment Strategies.pptx",
+  "template_name": "Template_Accenture Tech Acquisition Analysis.pptx",
   "dimensions": {
     "width": 13.33,
     "height": 7.5,
@@ -12,7 +12,7 @@
     "dk2": "#2C2C2C",
     "lt2": "#E8E8E8",
     "accent1": "#EF4444",
-    "accent2": "#DCDEF3",
+    "accent2": "#E97132",
     "accent3": "#196B24",
     "accent4": "#0F9ED5",
     "accent5": "#A02B93",
@@ -21,70 +21,111 @@
     "folHlink": "#96607D"
   },
   "fonts": {
-    "heading": "Oranienbaum",
-    "body": "Manrope"
+    "heading": "Libre Baskerville",
+    "body": "Inter"
   },
   "layouts": [
     {
       "index": 0,
-      "name": "Cover",
+      "name": "1_Cover",
       "placeholders": [
         {
           "idx": 10,
           "type": "BODY (2)",
-          "name": "Text Placeholder 15",
-          "x": 0.38,
-          "y": 3.1,
-          "w": 6.61,
-          "h": 0.67
+          "type_clean": "body",
+          "name": "Text Placeholder 12",
+          "x": 0.37,
+          "y": 3.32,
+          "w": 9.29,
+          "h": 0.54
         },
         {
           "idx": 11,
           "type": "BODY (2)",
-          "name": "Text Placeholder 15",
+          "type_clean": "body",
+          "name": "Text Placeholder 12",
           "x": 0.38,
-          "y": 4.33,
-          "w": 6.61,
-          "h": 0.81
+          "y": 4.41,
+          "w": 9.18,
+          "h": 0.3
         }
-      ]
+      ],
+      "signature": {
+        "body": 2
+      }
     },
     {
       "index": 1,
+      "name": "2_Cover",
+      "placeholders": [
+        {
+          "idx": 10,
+          "type": "BODY (2)",
+          "type_clean": "body",
+          "name": "Text Placeholder 12",
+          "x": 0.56,
+          "y": 3.19,
+          "w": 12.21,
+          "h": 0.61
+        },
+        {
+          "idx": 11,
+          "type": "BODY (2)",
+          "type_clean": "body",
+          "name": "Text Placeholder 12",
+          "x": 0.56,
+          "y": 4.32,
+          "w": 12.21,
+          "h": 0.67
+        }
+      ],
+      "signature": {
+        "body": 2
+      }
+    },
+    {
+      "index": 2,
       "name": "Divider",
       "placeholders": [
         {
           "idx": 10,
           "type": "BODY (2)",
-          "name": "Text Placeholder 15",
-          "x": 0.38,
-          "y": 3.35,
-          "w": 11.01,
-          "h": 0.61
+          "type_clean": "body",
+          "name": "Text Placeholder 12",
+          "x": 0.58,
+          "y": 3.51,
+          "w": 12.18,
+          "h": 0.47
         }
-      ]
-    },
-    {
-      "index": 2,
-      "name": "Blank",
-      "placeholders": []
+      ],
+      "signature": {
+        "body": 1
+      }
     },
     {
       "index": 3,
+      "name": "Blank",
+      "placeholders": [],
+      "signature": {}
+    },
+    {
+      "index": 4,
       "name": "Title only",
       "placeholders": [
         {
           "idx": 0,
           "type": "TITLE (1)",
+          "type_clean": "title",
           "name": "Title 1",
           "x": 0.38,
           "y": 0.66,
-          "w": 11.65,
+          "w": 11.58,
           "h": 0.58
         },
         {
           "idx": 11,
           "type": "OBJECT (7)",
+          "type_clean": "body",
           "name": "Content Placeholder 8",
           "x": 0.38,
           "y": 7.23,
@@ -94,25 +135,33 @@
         {
           "idx": 4,
           "type": "SLIDE_NUMBER (13)",
+          "type_clean": "slide_number",
           "name": "Slide Number Placeholder 3",
           "x": 9.94,
           "y": 7.23,
           "w": 3.0,
           "h": 0.13
         }
-      ]
+      ],
+      "signature": {
+        "title": 1,
+        "body": 1,
+        "slide_number": 1
+      }
     },
     {
-      "index": 4,
-      "name": "1_Thank you",
-      "placeholders": []
+      "index": 5,
+      "name": "Thank You",
+      "placeholders": [],
+      "signature": {}
     }
   ],
   "backgrounds": {
-    "Cover": "assets/bg_cover.png",
+    "1_Cover": "assets/bg_1_cover.png",
+    "2_Cover": "assets/bg_2_cover.png",
     "Divider": "assets/bg_divider.png",
     "Blank": "assets/bg_blank.png",
     "Title only": "assets/bg_title_only.png",
-    "1_Thank you": "assets/bg_1_thank_you.png"
+    "Thank You": "assets/bg_thank_you.png"
   }
 }

@@ -198,7 +198,7 @@ def add_text_box(slide, x, y, w, h, text, font_name, font_size, color,
     p.alignment = align
     return txBox
 
-def add_card(slide, x, y, w, h, fill_color, border_color=None, border_w=Pt(1), alpha=None):
+def add_card(slide, x, y, w, h, fill_color, border_color=None, border_w=Pt(1), alpha=None, shadow=False):
     shape = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, int(x), int(y), int(w), int(h))
     shape.fill.solid()
     shape.fill.fore_color.rgb = fill_color
@@ -207,6 +207,21 @@ def add_card(slide, x, y, w, h, fill_color, border_color=None, border_w=Pt(1), a
         a.set('val', str(alpha))
         shape.fill.fore_color._color._xClr.append(a)
         
+    if shadow:
+        try:
+            from pptx.oxml import parse_xml
+            shadow_xml = """<a:effectLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                <a:outerShdw blurRad="100000" dist="40000" dir="5400000" algn="b" rotWithShape="0">
+                    <a:srgbClr val="000000">
+                        <a:alpha val="15000"/>
+                    </a:srgbClr>
+                </a:outerShdw>
+            </a:effectLst>"""
+            effect_lst = parse_xml(shadow_xml)
+            shape.element.spPr.append(effect_lst)
+        except Exception:
+            pass
+
     if border_color:
         shape.line.color.rgb = border_color
         shape.line.width = border_w
@@ -292,7 +307,7 @@ def _add_bullet_list(slide, x, y, w, h, items, tokens, font_size=Pt(11)):
 # ─── Element Renderers ────────────────────────────────────────────────────────
 
 def render_grid(slide, element, tokens):
-    """Grid cards with numbered badges, separator lines, and tight spacing."""
+    """Infographic-style grid with distinct header strips and centered alignment."""
     items = element.get('items', [])
     cols = min(element.get('columns', 3), 4)
     if not items: return
@@ -302,10 +317,10 @@ def render_grid(slide, element, tokens):
     row_gap = Inches(0.20)
     card_w = int((CONTENT_W - gap * (cols - 1)) / cols)
     card_h = int((CONTENT_H - row_gap * (rows - 1)) / rows)
-    # Ensure a single row doesn't get massively tall arbitrarily, but allows generous space
     card_h = min(card_h, int(CONTENT_H * 0.8))
 
     badge_size = Inches(0.35)
+    header_strip_h = Inches(0.60)
 
     for i, item in enumerate(items):
         col = i % cols
@@ -313,92 +328,108 @@ def render_grid(slide, element, tokens):
         x = int(MARGIN_L) + col * (card_w + int(gap))
         y = int(CONTENT_TOP) + row * (card_h + int(row_gap))
 
-        # Card background
+        # Main Card Body with subtle accent tint (instead of faded lt2)
+        accent = tokens['colors']['accent1']
         add_card(slide, x, y, card_w, card_h,
-                hex_to_rgb(tokens['colors']['lt2']),
-                hex_to_rgb(tokens['colors']['accent1']))
+                hex_to_rgb(accent), 
+                border_color=hex_to_rgb(accent), border_w=Pt(1.5), alpha=15000, shadow=True)
 
-        # Numbered badge
+        # Header Strip (solid color)
+        strip = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, x, y, card_w, int(header_strip_h))
+        strip.fill.solid()
+        strip.fill.fore_color.rgb = hex_to_rgb(accent)
+        strip.line.fill.background()
+
+        # Numbered badge (offset overlapping strip)
         add_numbered_badge(slide, x + Inches(0.15), y + Inches(0.12), i + 1, tokens, badge_size)
 
-        # Heading (next to badge)
+        # Heading (inside the header strip)
         add_text_box(slide, x + Inches(0.15) + badge_size + Inches(0.08), y + Inches(0.12),
-                    card_w - Inches(0.38) - badge_size, Inches(0.35),
+                    card_w - Inches(0.38) - badge_size, badge_size,
                     item.get('heading', ''), tokens['fonts']['heading'], Pt(11),
-                    hex_to_rgb(tokens['colors']['dk1']), bold=True,
+                    hex_to_rgb(tokens['colors']['lt1']), bold=True,
                     valign=MSO_ANCHOR.MIDDLE)
 
-        # Separator under heading
-        add_hline(slide, x + Inches(0.15), y + Inches(0.55),
-                 card_w - Inches(0.30), hex_to_rgb(tokens['colors']['accent1']), Pt(0.75))
-
-        # Body text
-        add_text_box(slide, x + Inches(0.15), y + Inches(0.65),
-                    card_w - Inches(0.30), card_h - Inches(0.80),
+        # Body text (middle-aligned in the remaining space for better distribution)
+        add_text_box(slide, x + Inches(0.15), y + int(header_strip_h) + Inches(0.10),
+                    card_w - Inches(0.30), card_h - int(header_strip_h) - Inches(0.20),
                     item.get('body', ''), tokens['fonts']['body'], Pt(10),
-                    hex_to_rgb(tokens['colors']['dk2']))
+                    hex_to_rgb(tokens['colors']['dk2']), 
+                    align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.MIDDLE)
 
 
 def render_timeline(slide, element, tokens):
+    """High-contrast interlocking timeline process map."""
     steps = element.get('steps', [])
     if not steps: return
     n = len(steps)
-    gap = Inches(0.12)
+    gap = Inches(0.10)
     connector_w = Inches(0.20)
     box_w = int((CONTENT_W - connector_w * (n - 1) - gap * (n - 1) * 2) / n)
-    box_w = min(box_w, Inches(2.6))
-    box_h = int(CONTENT_H * 0.70)
-    badge_h = Inches(0.35)
+    box_w = min(box_w, Inches(2.8))
+    box_h = int(CONTENT_H * 0.65)
+    badge_h = Inches(0.40)
     total_w = n * box_w + (n - 1) * (int(gap) * 2 + int(connector_w))
     start_x = int(MARGIN_L) + int((CONTENT_W - total_w) / 2)
-    mid_y = int(CONTENT_TOP) + Inches(0.3)
+    mid_y = int(CONTENT_TOP) + Inches(0.4)
 
     for i, step in enumerate(steps):
         x = start_x + i * (box_w + int(gap) * 2 + int(connector_w))
 
-        # Badge
+        # Timeline track connector logic (draw line under badges)
+        if i < n - 1:
+            ax = x + box_w
+            ay = mid_y + int(badge_h / 2) - Inches(0.05)
+            arrow = slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, ax, ay, int(connector_w) + int(gap)*2, Inches(0.10))
+            arrow.fill.solid()
+            arrow.fill.fore_color.rgb = hex_to_rgb(tokens['colors']['accent1'])
+            arrow.line.fill.background()
+
+        # Step Label Badge (solid accent color as Pill Shape)
         badge = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, mid_y, box_w, int(badge_h))
         badge.fill.solid()
-        badge.fill.fore_color.rgb = hex_to_rgb(tokens['colors']['dk1'])
+        badge.fill.fore_color.rgb = hex_to_rgb(tokens['colors']['accent1'])
         badge.line.fill.background()
+        
+        try:
+            from pptx.oxml import parse_xml
+            adj_xml = '<a:avLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:gd name="adj" fmla="val 50000"/></a:avLst>'
+            prstGeom = badge.element.spPr.prstGeom
+            if prstGeom.avLst is not None:
+                prstGeom.remove(prstGeom.avLst)
+            prstGeom.append(parse_xml(adj_xml))
+        except Exception:
+            pass
+            
         tf = badge.text_frame
         _zero_margins(tf)
         tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-        tf.paragraphs[0].text = step.get('label', f'{i+1:02d}')
-        tf.paragraphs[0].font.size = Pt(13)
+        tf.paragraphs[0].text = step.get('label', f'{i+1:02d}').upper()
+        tf.paragraphs[0].font.size = Pt(12)
         tf.paragraphs[0].font.bold = True
         tf.paragraphs[0].font.color.rgb = hex_to_rgb(tokens['colors']['lt1'])
         tf.paragraphs[0].font.name = tokens['fonts']['heading']
         tf.paragraphs[0].alignment = PP_ALIGN.CENTER
 
-        # Box
-        box_y = mid_y + int(badge_h) + Inches(0.05)
+        # Box (Content area below badge)
+        box_y = mid_y + int(badge_h) + Inches(0.10)
         add_card(slide, x, box_y, box_w, int(box_h),
                 hex_to_rgb(tokens['colors']['lt2']),
-                hex_to_rgb(tokens['colors']['accent1']), Pt(0.75))
+                border_color=hex_to_rgb(tokens['colors']['accent1']), border_w=Pt(1.5), shadow=True)
 
         # Title
         add_text_box(slide, x + Inches(0.12), box_y + Inches(0.10), box_w - Inches(0.24), Inches(0.35),
                     step.get('title', '').upper(), tokens['fonts']['heading'], Pt(11),
-                    hex_to_rgb(tokens['colors']['dk1']), bold=True)
+                    hex_to_rgb(tokens['colors']['dk1']), bold=True, align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.MIDDLE)
 
-        # Line under title
-        add_hline(slide, x + Inches(0.12), box_y + Inches(0.48),
-                 box_w - Inches(0.24), hex_to_rgb(tokens['colors']['accent1']), Pt(0.5))
+        # Subtle separator
+        add_hline(slide, x + int((box_w - Inches(1.0))/2), box_y + Inches(0.50),
+                 Inches(1.0), hex_to_rgb(tokens['colors']['accent1']), Pt(2))
 
         # Description
-        add_text_box(slide, x + Inches(0.12), box_y + Inches(0.55), box_w - Inches(0.24), int(box_h) - Inches(0.65),
+        add_text_box(slide, x + Inches(0.15), box_y + Inches(0.60), box_w - Inches(0.30), int(box_h) - Inches(0.70),
                     step.get('description', ''), tokens['fonts']['body'], Pt(10),
-                    hex_to_rgb(tokens['colors']['dk2']))
-
-        # Connector arrow
-        if i < n - 1:
-            ax = x + box_w + int(gap)
-            ay = box_y + int(box_h / 2) - Inches(0.10)
-            arrow = slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, ax, ay, int(connector_w), Inches(0.20))
-            arrow.fill.solid()
-            arrow.fill.fore_color.rgb = hex_to_rgb(tokens['colors']['accent1'])
-            arrow.line.fill.background()
+                    hex_to_rgb(tokens['colors']['dk2']), align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.TOP)
 
 
 def render_hero(slide, element, tokens):
@@ -570,37 +601,39 @@ def render_two_column(slide, element, tokens):
 
 
 def render_stats_row(slide, element, tokens):
+    """Massive typography infographic stats blocks, vertically and horizontally centered."""
     items = element.get('items', [])
     if not items: return
     n = len(items)
-    gap = Inches(0.20)
+    gap = Inches(0.30)
     item_w = int((CONTENT_W - gap * (n - 1)) / n)
-    card_h = int(CONTENT_H * 0.60)
+    card_h = int(CONTENT_H * 0.65)
     mid_y = int(CONTENT_TOP) + int((CONTENT_H - card_h) / 2)
 
     for i, item in enumerate(items):
         x = int(MARGIN_L) + i * (item_w + int(gap))
 
-        # Card
+        # Add tinted backing card
+        accent_hex = tokens['colors']['accent1']
         add_card(slide, x, mid_y, item_w, card_h,
-                hex_to_rgb(tokens['colors']['lt2']),
-                hex_to_rgb(tokens['colors']['accent1']), Pt(0))
+                hex_to_rgb(accent_hex),
+                border_color=hex_to_rgb(accent_hex), border_w=Pt(1.5), alpha=10000, shadow=True)
 
-        # Big number
-        add_text_box(slide, x, mid_y + Inches(0.3), item_w, Inches(1.0),
-                    item.get('value', ''), tokens['fonts']['heading'], Pt(30),
-                    hex_to_rgb(tokens['colors']['dk1']), bold=True,
+        # Big number - centered
+        add_text_box(slide, x, mid_y + Inches(0.2), item_w, Inches(1.2),
+                    item.get('value', ''), tokens['fonts']['heading'], Pt(42),
+                    hex_to_rgb(accent_hex), bold=True,
                     align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.MIDDLE)
 
-        # Label
-        add_text_box(slide, x + Inches(0.2), mid_y + Inches(1.4), item_w - Inches(0.4), card_h - Inches(1.6),
-                    item.get('label', ''), tokens['fonts']['body'], Pt(12),
-                    hex_to_rgb(tokens['colors']['dk2']),
-                    align=PP_ALIGN.CENTER)
+        # Accent thin underline under number
+        add_hline(slide, x + int(item_w * 0.25), mid_y + Inches(1.50),
+                 int(item_w * 0.50), hex_to_rgb(accent_hex), Pt(2))
 
-        # Accent underline
-        add_hline(slide, x + int(item_w * 0.25), mid_y + card_h - Inches(0.4),
-                 int(item_w * 0.50), hex_to_rgb(tokens['colors']['accent1']), Pt(2))
+        # Label - vertically distributed to fill remaining space
+        add_text_box(slide, x + Inches(0.15), mid_y + Inches(1.6), item_w - Inches(0.3), card_h - Inches(1.8),
+                    item.get('label', ''), tokens['fonts']['body'], Pt(12),
+                    hex_to_rgb(tokens['colors']['dk1']), bold=True,
+                    align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.MIDDLE)
 
 
 def render_quote(slide, element, tokens):
@@ -630,70 +663,80 @@ def render_quote(slide, element, tokens):
 
 
 def render_comparison(slide, element, tokens):
-    col_w = int((CONTENT_W - Inches(0.30)) / 2)
-    divider_x = int(MARGIN_L) + col_w + int(Inches(0.15))
-
-    # Vertical divider
-    add_vline(slide, divider_x, int(CONTENT_TOP),
-             int(CONTENT_H), hex_to_rgb(tokens['colors']['accent1']), Pt(1))
+    """High-contrast split-screen comparison block."""
+    col_w = int((CONTENT_W - Inches(0.40)) / 2)
+    divider_x = int(MARGIN_L) + col_w + int(Inches(0.20))
 
     for idx, side in enumerate(['left', 'right']):
         data = element.get(side, {})
         if not data: continue
-        x = int(MARGIN_L) + idx * (col_w + Inches(0.30))
-        accent = tokens['colors']['accent1'] if idx == 0 else tokens['colors'].get('accent3', tokens['colors']['accent2'])
+        x = int(MARGIN_L) + idx * (col_w + Inches(0.40))
+        # High contrast: Use primary accent for Left, secondary for Right
+        accent_hex = tokens['colors']['accent1'] if idx == 0 else tokens['colors'].get('accent3', tokens['colors']['accent2'])
 
-        # Title
-        add_text_box(slide, x, int(CONTENT_TOP) + Inches(0.05), col_w, Inches(0.40),
-                    data.get('title', ''), tokens['fonts']['heading'], Pt(14),
-                    hex_to_rgb(accent), bold=True)
+        # Heavy Header Strip
+        strip_h = Inches(0.60)
+        strip = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, int(CONTENT_TOP), col_w, int(strip_h))
+        strip.fill.solid()
+        strip.fill.fore_color.rgb = hex_to_rgb(accent_hex)
+        strip.line.fill.background()
+        
+        add_text_box(slide, x + Inches(0.10), int(CONTENT_TOP), col_w - Inches(0.20), strip_h,
+                    data.get('title', '').upper(), tokens['fonts']['heading'], Pt(14),
+                    hex_to_rgb(tokens['colors']['lt1']), bold=True,
+                    align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.MIDDLE)
 
-        # Separator under title
-        add_hline(slide, x, int(CONTENT_TOP) + Inches(0.50), col_w,
-                 hex_to_rgb(accent), Pt(1.5))
+        # Tinted Content Background Drop
+        card_h = int(CONTENT_H) - int(strip_h) - Inches(0.10)
+        add_card(slide, x, int(CONTENT_TOP) + int(strip_h) + Inches(0.10), col_w, card_h,
+                hex_to_rgb(accent_hex), border_color=None, alpha=10000, shadow=True)
 
-        # Points
+        # Bullet List Points
         points = data.get('points', [])
         if points:
-            _add_bullet_list(slide, x, int(CONTENT_TOP) + Inches(0.65),
-                           col_w, int(CONTENT_H) - Inches(0.85),
-                           points, tokens, Pt(10))
+            _add_bullet_list(slide, x + Inches(0.20), int(CONTENT_TOP) + int(strip_h) + Inches(0.30),
+                           col_w - Inches(0.40), card_h - Inches(0.40),
+                           points, tokens, Pt(11))
 
 
-def add_vector_badge(slide, x, y, size, icon, bg_color, text_color, font_name):
-    # Base transparent circle
+def add_vector_badge(slide, x, y, size, icon, bg_color, text_color, font_name, alpha_val='100000'):
+    # Base circle badge
     bg = slide.shapes.add_shape(MSO_SHAPE.OVAL, int(x), int(y), int(size), int(size))
     bg.fill.solid()
     bg.fill.fore_color.rgb = bg_color
     bg.line.fill.background()
     
-    a = OxmlElement('a:alpha')
-    a.set('val', '40000') # 40% opacity for the badge background
-    bg.fill.fore_color._color._xClr.append(a)
+    if alpha_val != '100000':
+        a = OxmlElement('a:alpha')
+        a.set('val', str(alpha_val)) # Opacity
+        bg.fill.fore_color._color._xClr.append(a)
     
-    # Text icon inside
+    # Text icon inside, perfectly centered
     tf = bg.text_frame
     _zero_margins(tf)
     tf.vertical_anchor = MSO_ANCHOR.MIDDLE
     p = tf.paragraphs[0]
     p.text = icon
     p.font.name = font_name
-    p.font.size = Pt(int((size / 914400) * 28))
+    p.font.size = Pt(int((size / 914400) * 32)) # Massive icon relative to badge size
     p.font.color.rgb = text_color
     p.alignment = PP_ALIGN.CENTER
     return bg
 
 def render_icon_grid(slide, element, tokens):
+    """Icon grid mapping heavily centered icons and typography with distinct contrast borders."""
     items = element.get('items', [])
     cols = min(element.get('columns', 3), 4)
     if not items: return
 
-    gap = Inches(0.20)
+    gap = Inches(0.25)
     rows = -(-len(items) // cols)
-    row_gap = Inches(0.15)
+    row_gap = Inches(0.35)
     card_w = int((CONTENT_W - gap * (cols - 1)) / cols)
     card_h = int((CONTENT_H - row_gap * (rows - 1)) / rows)
     card_h = min(card_h, int(CONTENT_H * 0.8))
+
+    badge_size = Inches(0.60)
 
     for i, item in enumerate(items):
         col = i % cols
@@ -701,32 +744,39 @@ def render_icon_grid(slide, element, tokens):
         x = int(MARGIN_L) + col * (card_w + int(gap))
         y = int(CONTENT_TOP) + row * (card_h + int(row_gap))
 
-        # Card
+        # Main tinted transparent card
+        accent = tokens['colors']['accent1']
         add_card(slide, x, y, card_w, card_h,
-                hex_to_rgb(tokens['colors']['lt2']),
-                hex_to_rgb(tokens['colors']['accent1']), Pt(0.75), alpha=60000)
+                hex_to_rgb(accent),
+                hex_to_rgb(accent), Pt(1.5), alpha=15000, shadow=True)
 
-        # Vector Icon Badge
-        add_vector_badge(slide, x + Inches(0.12), y + Inches(0.10), Inches(0.40),
-                        item.get('icon', ''), hex_to_rgb(tokens['colors']['accent1']),
-                        hex_to_rgb(tokens['colors']['dk1']), tokens['fonts']['body'])
+        # Center-top overlapping Vector Icon Badge (prominent, 100% opacity solid fill)
+        badge_y = y - int(badge_size / 2)
+        badge_x = x + int(card_w / 2) - int(badge_size / 2)
+        add_vector_badge(slide, badge_x, badge_y, badge_size,
+                        item.get('icon', '🔹'), hex_to_rgb(tokens['colors']['accent1']),
+                        hex_to_rgb(tokens['colors']['lt1']), tokens['fonts']['body'])
 
-        # Title
-        add_text_box(slide, x + Inches(0.12) + Inches(0.50), y + Inches(0.12),
-                    card_w - Inches(0.74), Inches(0.35),
-                    item.get('title', ''), tokens['fonts']['heading'], Pt(11),
+        # Bold Centered Title
+        title_y = y + int(badge_size/2) + Inches(0.10)
+        title_h = Inches(0.40)
+        add_text_box(slide, x + Inches(0.10), title_y,
+                    card_w - Inches(0.20), title_h,
+                    item.get('title', ''), tokens['fonts']['heading'], Pt(12),
                     hex_to_rgb(tokens['colors']['dk1']), bold=True,
-                    valign=MSO_ANCHOR.MIDDLE)
+                    align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.MIDDLE)
 
-        # Line
-        add_hline(slide, x + Inches(0.12), y + Inches(0.52),
-                 card_w - Inches(0.24), hex_to_rgb(tokens['colors']['accent1']), Pt(0.5))
+        # Accent H-Line
+        add_hline(slide, x + int((card_w - Inches(1.0))/2), title_y + title_h + Inches(0.05),
+                 Inches(1.0), hex_to_rgb(tokens['colors'].get('accent2', accent)), Pt(1.5))
 
-        # Description
-        add_text_box(slide, x + Inches(0.12), y + Inches(0.60),
-                    card_w - Inches(0.24), card_h - Inches(0.72),
+        # Description (Middle aligned inside remaining space)
+        desc_y = title_y + title_h + Inches(0.15)
+        add_text_box(slide, x + Inches(0.15), desc_y,
+                    card_w - Inches(0.30), card_h - (desc_y - y) - Inches(0.10),
                     item.get('description', ''), tokens['fonts']['body'], Pt(10),
-                    hex_to_rgb(tokens['colors']['dk2']))
+                    hex_to_rgb(tokens['colors']['dk2']),
+                    align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.TOP)
 
 
 def render_funnel(slide, element, tokens):
@@ -800,35 +850,42 @@ def render_pyramid(slide, element, tokens):
 
 
 def render_matrix(slide, element, tokens):
+    """High-contrast 2x2 matrix map using heavy boundary lines and completely filled alpha masks."""
     quadrants = element.get('quadrants', [])
     if len(quadrants) < 4: return
 
-    mat_w = int((int(CONTENT_W) - Inches(0.20)) / 2)
-    mat_h = int((int(CONTENT_H) - Inches(0.20)) / 2)
+    mat_w = int((int(CONTENT_W) - Inches(0.15)) / 2)
+    mat_h = int((int(CONTENT_H) - Inches(0.15)) / 2)
     colors = [tokens['colors']['accent1'], tokens['colors'].get('accent3', tokens['colors']['accent2']),
               tokens['colors']['accent2'], tokens['colors']['accent4']]
     positions = [(0, 0), (1, 0), (0, 1), (1, 1)]
 
     for idx, (q, (c, r)) in enumerate(zip(quadrants, positions)):
-        x = int(MARGIN_L) + c * (mat_w + Inches(0.20))
-        y = int(CONTENT_TOP) + r * (mat_h + Inches(0.20))
+        x = int(MARGIN_L) + c * (mat_w + Inches(0.15))
+        y = int(CONTENT_TOP) + r * (mat_h + Inches(0.15))
 
+        # Matrix block background (15% filled assigned color)
         add_card(slide, x, y, mat_w, mat_h,
-                hex_to_rgb(tokens['colors']['lt2']),
-                hex_to_rgb(colors[idx]))
+                hex_to_rgb(colors[idx]),
+                border_color=hex_to_rgb(colors[idx]), border_w=Pt(2), alpha=15000, shadow=True)
 
-        add_text_box(slide, x + Inches(0.12), y + Inches(0.08), mat_w - Inches(0.24), Inches(0.30),
+        # Full width header within block
+        header_h = Inches(0.40)
+        h_strip = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, x, y, mat_w, int(header_h))
+        h_strip.fill.solid()
+        h_strip.fill.fore_color.rgb = hex_to_rgb(colors[idx])
+        h_strip.line.fill.background()
+
+        add_text_box(slide, x + Inches(0.10), y, mat_w - Inches(0.20), header_h,
                     q.get('label', '').upper(), tokens['fonts']['heading'], Pt(11),
-                    hex_to_rgb(colors[idx]), bold=True)
-
-        add_hline(slide, x + Inches(0.12), y + Inches(0.40),
-                 mat_w - Inches(0.24), hex_to_rgb(colors[idx]), Pt(0.75))
+                    hex_to_rgb(tokens['colors']['lt1']), bold=True,
+                    align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.MIDDLE)
 
         items = q.get('items', [])
         if items:
-            _add_bullet_list(slide, x + Inches(0.12), y + Inches(0.48),
-                           mat_w - Inches(0.24), mat_h - Inches(0.60),
-                           items, tokens, Pt(9))
+            _add_bullet_list(slide, x + Inches(0.15), y + header_h + Inches(0.10),
+                           mat_w - Inches(0.30), mat_h - header_h - Inches(0.20),
+                           items, tokens, Pt(10))
 
 
 def render_swot(slide, element, tokens):
@@ -1038,6 +1095,128 @@ def render_waterfall(slide, element, tokens):
         if not is_total: cumulative += val
 
 
+# ─── Native Placeholder Rendering (Hybrid) ────────────────────────────────────
+
+def populate_placeholders(slide, slide_def, tokens):
+    """
+    Attempt to render content natively using template placeholders.
+    Returns True if successful, False if we need to fall back to the shape engine.
+    """
+    # 1. Discover placeholders
+    placeholders = {'title': [], 'body': [], 'picture': []}
+    for ph in slide.placeholders:
+        ph_type = str(ph.placeholder_format.type).split('(')[0].strip().lower().replace(' ', '_')
+        if ph_type in ('title', 'center_title', 'vertical_title'):
+            placeholders['title'].append(ph)
+        elif ph_type in ('body', 'object', 'vertical_body'):
+            placeholders['body'].append(ph)
+        elif ph_type in ('picture', 'bitmap'):
+            placeholders['picture'].append(ph)
+
+    for k in placeholders:
+        placeholders[k].sort(key=lambda p: (p.top, p.left))
+
+    elements = slide_def.get('elements', [])
+    complex_types = {
+        'hero', 'icon_grid', 'pyramid', 'funnel', 'matrix', 'swot', 
+        'waterfall', 'cycle', 'gauge', 'kpi_cards', 'chart', 'table',
+        'timeline'
+    }
+
+    if elements:
+        first_el = elements[0]
+        # Skip if complex visual
+        if first_el.get('type') in complex_types:
+            return False
+            
+        # Two column needs at least 2 body placeholders
+        if first_el.get('type') == 'two_column' and len(placeholders['body']) < 2:
+            return False
+
+        # If it's a simple type but we have 0 body placeholders, we must fallback
+        if not placeholders['body']:
+            return False
+
+    # 2. Populate Title
+    title_text = slide_def.get('title', '')
+    if title_text and placeholders['title']:
+        try:
+            from content_fitter import calculate_fit_font_size
+            title_ph = placeholders['title'][0]
+            title_ph.text = title_text
+            fit_sz = calculate_fit_font_size(title_text, title_ph.width/914400, title_ph.height/914400, max_font_pt=32) if title_ph.width else 24
+            
+            for p in title_ph.text_frame.paragraphs:
+                p.font.name = tokens['fonts']['heading']
+                p.font.bold = True
+                p.font.color.rgb = hex_to_rgb(tokens['colors']['dk1'])
+                p.font.size = Pt(fit_sz)
+        except Exception as e:
+            print(f"Error fitting title: {e}")
+
+    # 3. Populate Body
+    if elements and placeholders['body']:
+        first_el = elements[0]
+        etype = first_el.get('type', '')
+        
+        try:
+            from content_fitter import calculate_bullet_fit
+            
+            if etype == 'bullets':
+                items = first_el.get('items', [])
+                body_ph = placeholders['body'][0]
+                fit_sz = calculate_bullet_fit(items, body_ph.width/914400, body_ph.height/914400, max_font_pt=18) if body_ph.width else 14
+                    
+                tf = body_ph.text_frame
+                tf.clear()
+                
+                for i, item in enumerate(items):
+                    text = item if isinstance(item, str) else item.get('text', '')
+                    p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+                    p.text = text
+                    p.font.name = tokens['fonts']['body']
+                    p.font.size = Pt(fit_sz)
+                    p.font.color.rgb = hex_to_rgb(tokens['colors']['dk1'])
+                    p.level = 0
+            
+            elif etype == 'two_column':
+                cols = first_el.get('columns', [])
+                for col_idx, col in enumerate(cols[:2]):
+                    items = col.get('items', [])
+                    body_ph = placeholders['body'][col_idx]
+                    fit_sz = calculate_bullet_fit(items, body_ph.width/914400, body_ph.height/914400, max_font_pt=16) if body_ph.width else 14
+                        
+                    tf = body_ph.text_frame
+                    tf.clear()
+                    
+                    header = col.get('header', '')
+                    start_idx = 0
+                    if header:
+                        p = tf.paragraphs[0]
+                        p.text = header
+                        p.font.name = tokens['fonts']['heading']
+                        p.font.size = Pt(fit_sz + 2)
+                        p.font.bold = True
+                        p.font.color.rgb = hex_to_rgb(tokens['colors']['accent1'])
+                        start_idx = 1
+                    
+                    for i, item in enumerate(items):
+                        text = item if isinstance(item, str) else item.get('text', '')
+                        p = tf.paragraphs[0] if (i == 0 and start_idx == 0) else tf.add_paragraph()
+                        p.text = text
+                        p.font.name = tokens['fonts']['body']
+                        p.font.size = Pt(fit_sz)
+                        p.font.color.rgb = hex_to_rgb(tokens['colors']['dk1'])
+                        p.level = 0
+            else:
+                return False
+        except Exception as e:
+            print(f"Error in native generation: {e}")
+            return False
+
+    return True
+
+
 # ─── Renderer Dispatch ────────────────────────────────────────────────────────
 
 RENDERERS = {
@@ -1161,23 +1340,34 @@ def compile_presentation(tokens_path, plan_path, template_path, output_path):
         # Section label
         add_section_label(slide, f"SECTION {section_counter}", tokens)
 
-        # Title
-        add_title(slide, slide_def.get('title', ''), tokens)
-
         # Footer
         add_footer(slide, tokens, idx + 1, report_name)
 
-        # Render elements
-        for element in slide_def.get('elements', []):
-            etype = element.get('type', '')
-            renderer = RENDERERS.get(etype)
-            if renderer:
-                try:
-                    renderer(slide, element, tokens)
-                except Exception as e:
-                    print(f"    WARNING: Error rendering '{etype}': {e}")
-            else:
-                print(f"    WARNING: Unknown element type '{etype}', skipping.")
+        # Try native placeholder filling first (Hybrid Approach)
+        is_native = False
+        elements = slide_def.get('elements', [])
+        
+        if elements:
+            etype = elements[0].get('type', '')
+            if etype in ('bullets', 'two_column'):
+                is_native = populate_placeholders(slide, slide_def, tokens)
+                if is_native:
+                    print(f"    -> Rendered natively using template placeholders")
+
+        if not is_native:
+            # Fall back to custom shape rendering engine
+            add_title(slide, slide_def.get('title', ''), tokens)
+            
+            for element in slide_def.get('elements', []):
+                etype = element.get('type', '')
+                renderer = RENDERERS.get(etype)
+                if renderer:
+                    try:
+                        renderer(slide, element, tokens)
+                    except Exception as e:
+                        print(f"    WARNING: Error rendering '{etype}': {e}")
+                else:
+                    print(f"    WARNING: Unknown element type '{etype}', skipping.")
 
     os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
     prs.save(output_path)

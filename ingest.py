@@ -62,25 +62,49 @@ def extract_fonts(theme_xml: etree._Element) -> dict:
 
 # ─── Layout Catalog ───────────────────────────────────────────────────────────
 
+def _normalize_ph_type(ph_type_str: str) -> str:
+    """Normalize placeholder type enum to a clean lowercase name."""
+    # ph_type_str is like 'TITLE (15)' or 'BODY (2)'
+    name = str(ph_type_str).split('(')[0].strip().lower()
+    name = name.replace(' ', '_')
+    # Map common aliases
+    aliases = {
+        'center_title': 'title',
+        'subtitle': 'subtitle',
+        'vertical_body': 'body',
+        'vertical_title': 'title',
+        'vertical_object': 'body',
+        'object': 'body',
+    }
+    return aliases.get(name, name)
+
+
 def extract_layouts(prs: Presentation) -> list:
-    """Extract layout names, indices, and placeholder geometry."""
+    """Extract layout names, indices, placeholder geometry, and type signatures."""
     layouts = []
     for i, layout in enumerate(prs.slide_layouts):
         placeholders = []
+        signature = {}  # Count of each placeholder type
         for ph in layout.placeholders:
+            ph_type_raw = str(ph.placeholder_format.type)
+            ph_type_clean = _normalize_ph_type(ph_type_raw)
             placeholders.append({
                 "idx": ph.placeholder_format.idx,
-                "type": str(ph.placeholder_format.type),
+                "type": ph_type_raw,
+                "type_clean": ph_type_clean,
                 "name": ph.name,
                 "x": round(ph.left / Emu(914400), 2),   # EMU → inches
                 "y": round(ph.top / Emu(914400), 2),
                 "w": round(ph.width / Emu(914400), 2),
                 "h": round(ph.height / Emu(914400), 2),
             })
+            signature[ph_type_clean] = signature.get(ph_type_clean, 0) + 1
+
         layouts.append({
             "index": i,
             "name": layout.name,
             "placeholders": placeholders,
+            "signature": signature,
         })
     return layouts
 
