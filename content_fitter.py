@@ -19,10 +19,10 @@ from pptx.util import Pt, Emu, Inches
 
 # Average character width as fraction of font size (em units)
 # Calibri/Arial average ~0.52em per character
-AVG_CHAR_WIDTH_RATIO = 0.52
+AVG_CHAR_WIDTH_RATIO = 0.58
 
 # Average line height as fraction of font size
-LINE_HEIGHT_RATIO = 1.35
+LINE_HEIGHT_RATIO = 1.40
 
 
 def estimate_text_lines(text: str, font_size_pt: float, box_width_inches: float) -> int:

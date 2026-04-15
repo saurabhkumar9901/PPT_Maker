@@ -73,17 +73,22 @@ def _small_margins(tf, lr=Inches(0.08), tb=Inches(0.04)):
 
 def get_layout(prs, layout_type):
     name_map = {
-        'cover': ['cover', '1_cover', '2_cover', '0_title company'],
-        'divider': ['divider', 'c_section blue', 'section'],
-        'content': ['title only', '1_e_title, subtitle and body', 'blank'],
-        'chart': ['title only', '1_e_title, subtitle and body', 'blank'],
-        'thank_you': ['1_thank you', 'thank you', 'thank_you'],
+        'cover': ['cover', 'title slide', 'title format', '1_cover', '2_cover', '0_title company'],
+        'divider': ['divider', 'section header', 'section', 'c_section blue'],
+        'content': ['title and content', 'title & content', 'title, content', 'content', 'title only', '1_e_title, subtitle and body', 'blank', '2_title and content'],
+        'chart': ['title and content', 'title & content', 'title only', '1_e_title, subtitle and body', 'blank'],
+        'thank_you': ['thank you', 'closing', 'end', '1_thank you', 'thank_you'],
     }
     candidates = name_map.get(layout_type, name_map['content'])
     for cand in candidates:
         for layout in prs.slide_layouts:
             if cand in layout.name.lower():
                 return layout
+                
+    # Intelligent fallback: most corporate templates use layouts[1] as the core content layout
+    if layout_type in ('content', 'chart') and len(prs.slide_layouts) > 1:
+        return prs.slide_layouts[1]
+        
     return prs.slide_layouts[0] if len(prs.slide_layouts) > 0 else None
 
 
@@ -179,6 +184,7 @@ def add_title(slide, title_text, tokens):
 # ─── Primitive helpers ────────────────────────────────────────────────────────
 
 from pptx.oxml.xmlchemy import OxmlElement
+from content_fitter import calculate_fit_font_size, calculate_bullet_fit
 
 def add_text_box(slide, x, y, w, h, text, font_name, font_size, color,
                  bold=False, align=PP_ALIGN.LEFT, valign=MSO_ANCHOR.TOP, wrap=True, zero_margin=True):
@@ -189,10 +195,17 @@ def add_text_box(slide, x, y, w, h, text, font_name, font_size, color,
     tf.vertical_anchor = valign
     if zero_margin:
         _zero_margins(tf)
+        
+    # Dynamic text fitting
+    pt_size = font_size.pt if hasattr(font_size, 'pt') else (font_size / 12700.0)
+    w_inches = int(w) / 914400.0
+    h_inches = int(h) / 914400.0
+    fit_pt = calculate_fit_font_size(str(text), w_inches, h_inches, max_font_pt=pt_size)
+    
     p = tf.paragraphs[0]
     p.text = str(text)
     p.font.name = font_name
-    p.font.size = font_size
+    p.font.size = Pt(fit_pt)
     p.font.bold = bold
     p.font.color.rgb = color
     p.alignment = align
@@ -268,6 +281,13 @@ def _add_bullet_list(slide, x, y, w, h, items, tokens, font_size=Pt(11)):
     tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
     _zero_margins(tf)
 
+    # Dynamic scaling
+    pt_size = font_size.pt if hasattr(font_size, 'pt') else (font_size / 12700.0)
+    w_inches = int(w) / 914400.0
+    h_inches = int(h) / 914400.0
+    fit_pt = calculate_bullet_fit(items, w_inches, h_inches, max_font_pt=pt_size)
+    actual_font_size = Pt(fit_pt)
+
     for i, item in enumerate(items):
         if isinstance(item, str):
             text = item
@@ -277,20 +297,20 @@ def _add_bullet_list(slide, x, y, w, h, items, tokens, font_size=Pt(11)):
             bold_prefix = item.get('bold_prefix', None)
 
         p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-        p.space_after = Pt(6)
+        p.space_after = Pt(max(2, fit_pt / 2))
 
         if bold_prefix:
             run = p.add_run()
             run.text = bold_prefix + '  '
             run.font.name = tokens['fonts']['heading']
-            run.font.size = font_size
+            run.font.size = actual_font_size
             run.font.bold = True
             run.font.color.rgb = hex_to_rgb(tokens['colors']['dk1'])
 
         run = p.add_run()
         run.text = text
         run.font.name = tokens['fonts']['body']
-        run.font.size = font_size
+        run.font.size = actual_font_size
         run.font.color.rgb = hex_to_rgb(tokens['colors']['dk2'])
 
         # Bullet via XML
@@ -331,8 +351,7 @@ def render_grid(slide, element, tokens):
         # Main Card Body with subtle accent tint (instead of faded lt2)
         accent = tokens['colors']['accent1']
         add_card(slide, x, y, card_w, card_h,
-                hex_to_rgb(accent), 
-                border_color=hex_to_rgb(accent), border_w=Pt(1.5), alpha=15000, shadow=True)
+                fill_color=hex_to_rgb(tokens['colors']['lt1']), border_color=hex_to_rgb(tokens['colors']['accent1']), border_w=Pt(2.0), shadow=True)
 
         # Header Strip (solid color)
         strip = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, x, y, card_w, int(header_strip_h))
@@ -414,7 +433,7 @@ def render_timeline(slide, element, tokens):
         # Box (Content area below badge)
         box_y = mid_y + int(badge_h) + Inches(0.10)
         add_card(slide, x, box_y, box_w, int(box_h),
-                hex_to_rgb(tokens['colors']['lt2']),
+                hex_to_rgb(tokens['colors']['lt1']),
                 border_color=hex_to_rgb(tokens['colors']['accent1']), border_w=Pt(1.5), shadow=True)
 
         # Title
@@ -441,7 +460,7 @@ def render_hero(slide, element, tokens):
     if query:
         add_card(slide, MARGIN_L + Inches(1.0), CONTENT_TOP + Inches(1.0), 
                  CONTENT_W - Inches(2.0), CONTENT_H - Inches(1.0), 
-                 hex_to_rgb(tokens['colors']['lt1']), alpha=90000, border_color=None)
+                 hex_to_rgb(tokens['colors']['lt1']), border_color=None)
     
     add_text_box(slide, MARGIN_L + Inches(0.5), CONTENT_TOP + Inches(1.5 if query else 0.6),
                 CONTENT_W - Inches(1.0), Inches(1.2),
@@ -499,14 +518,35 @@ def render_chart(slide, element, tokens):
         chart.legend.position = XL_LEGEND_POSITION.BOTTOM
         chart.legend.include_in_layout = False
         chart.legend.font.color.rgb = hex_to_rgb(tokens['colors']['dk2'])
+        chart.legend.font.name = tokens['fonts']['body']
+        chart.legend.font.size = Pt(10)
     except Exception:
         pass
 
     try:
-        for series in chart.series:
+        # Give charts the accent colors
+        colors = [tokens['colors'].get(f'accent{i}', tokens['colors']['accent1']) for i in range(1, 7)]
+        
+        for i, series in enumerate(chart.series):
+            # Apply corporate styling to bars/lines
+            try:
+                if chart_type in (XL_CHART_TYPE.BAR_CLUSTERED, XL_CHART_TYPE.COLUMN_CLUSTERED, XL_CHART_TYPE.PIE, XL_CHART_TYPE.DOUGHNUT, XL_CHART_TYPE.AREA):
+                    fill = series.format.fill
+                    fill.solid()
+                    fill.fore_color.rgb = hex_to_rgb(colors[i % len(colors)])
+                elif chart_type == XL_CHART_TYPE.LINE:
+                    line = series.format.line
+                    line.color.rgb = hex_to_rgb(colors[i % len(colors)])
+                    line.width = Pt(2.5)
+            except Exception:
+                pass
+
             series.has_data_labels = True
             try:
                 series.data_labels.font.color.rgb = hex_to_rgb(tokens['colors']['dk2'])
+                series.data_labels.font.name = tokens['fonts']['body']
+                series.data_labels.font.size = Pt(9)
+                series.data_labels.font.bold = True
             except Exception:
                 pass
     except Exception:
@@ -616,8 +656,7 @@ def render_stats_row(slide, element, tokens):
         # Add tinted backing card
         accent_hex = tokens['colors']['accent1']
         add_card(slide, x, mid_y, item_w, card_h,
-                hex_to_rgb(accent_hex),
-                border_color=hex_to_rgb(accent_hex), border_w=Pt(1.5), alpha=10000, shadow=True)
+                fill_color=hex_to_rgb(tokens['colors']['lt1']), border_color=hex_to_rgb(tokens['colors']['accent1']), border_w=Pt(2.0), shadow=True)
 
         # Big number - centered
         add_text_box(slide, x, mid_y + Inches(0.2), item_w, Inches(1.2),
@@ -672,7 +711,7 @@ def render_comparison(slide, element, tokens):
         if not data: continue
         x = int(MARGIN_L) + idx * (col_w + Inches(0.40))
         # High contrast: Use primary accent for Left, secondary for Right
-        accent_hex = tokens['colors']['accent1'] if idx == 0 else tokens['colors'].get('accent3', tokens['colors']['accent2'])
+        accent_hex = tokens['colors']['accent1'] if idx == 0 else tokens['colors'].get('accent3', tokens['colors']['accent1'])
 
         # Heavy Header Strip
         strip_h = Inches(0.60)
@@ -689,7 +728,7 @@ def render_comparison(slide, element, tokens):
         # Tinted Content Background Drop
         card_h = int(CONTENT_H) - int(strip_h) - Inches(0.10)
         add_card(slide, x, int(CONTENT_TOP) + int(strip_h) + Inches(0.10), col_w, card_h,
-                hex_to_rgb(accent_hex), border_color=None, alpha=10000, shadow=True)
+                hex_to_rgb(tokens['colors']['lt1']), border_color=hex_to_rgb(accent_hex), border_w=Pt(2.0), shadow=True)
 
         # Bullet List Points
         points = data.get('points', [])
@@ -747,8 +786,7 @@ def render_icon_grid(slide, element, tokens):
         # Main tinted transparent card
         accent = tokens['colors']['accent1']
         add_card(slide, x, y, card_w, card_h,
-                hex_to_rgb(accent),
-                hex_to_rgb(accent), Pt(1.5), alpha=15000, shadow=True)
+                fill_color=hex_to_rgb(tokens['colors']['lt1']), border_color=hex_to_rgb(tokens['colors']['accent1']), border_w=Pt(2.0), shadow=True)
 
         # Center-top overlapping Vector Icon Badge (prominent, 100% opacity solid fill)
         badge_y = y - int(badge_size / 2)
@@ -768,7 +806,7 @@ def render_icon_grid(slide, element, tokens):
 
         # Accent H-Line
         add_hline(slide, x + int((card_w - Inches(1.0))/2), title_y + title_h + Inches(0.05),
-                 Inches(1.0), hex_to_rgb(tokens['colors'].get('accent2', accent)), Pt(1.5))
+                 Inches(1.0), hex_to_rgb(tokens['colors'].get('accent3', accent)), Pt(1.5))
 
         # Description (Middle aligned inside remaining space)
         desc_y = title_y + title_h + Inches(0.15)
@@ -786,7 +824,7 @@ def render_funnel(slide, element, tokens):
     step_h = int(CONTENT_H / n)
     max_w = int(CONTENT_W) - Inches(1.0)
     min_w = int(max_w * 0.3)
-    colors = [tokens['colors']['accent1'], tokens['colors']['accent2'], tokens['colors']['accent3'],
+    colors = [tokens['colors']['accent1'], tokens['colors']['accent3'], tokens['colors']['accent3'],
               tokens['colors']['accent4'], tokens['colors']['accent5']]
 
     for i, step in enumerate(steps):
@@ -821,7 +859,7 @@ def render_pyramid(slide, element, tokens):
     step_h = int(CONTENT_H / n)
     max_w = int(CONTENT_W) - Inches(1.0)
     min_w = int(max_w * 0.25)
-    colors = [tokens['colors']['accent1'], tokens['colors']['accent2'],
+    colors = [tokens['colors']['accent1'], tokens['colors']['accent3'],
               tokens['colors']['accent3'], tokens['colors']['accent4']]
 
     for i, level in enumerate(levels):
@@ -856,8 +894,8 @@ def render_matrix(slide, element, tokens):
 
     mat_w = int((int(CONTENT_W) - Inches(0.15)) / 2)
     mat_h = int((int(CONTENT_H) - Inches(0.15)) / 2)
-    colors = [tokens['colors']['accent1'], tokens['colors'].get('accent3', tokens['colors']['accent2']),
-              tokens['colors']['accent2'], tokens['colors']['accent4']]
+    colors = [tokens['colors']['accent1'], tokens['colors'].get('accent3', tokens['colors']['accent1']),
+              tokens['colors'].get('accent3', tokens['colors']['accent1']), tokens['colors']['accent4']]
     positions = [(0, 0), (1, 0), (0, 1), (1, 1)]
 
     for idx, (q, (c, r)) in enumerate(zip(quadrants, positions)):
@@ -866,8 +904,8 @@ def render_matrix(slide, element, tokens):
 
         # Matrix block background (15% filled assigned color)
         add_card(slide, x, y, mat_w, mat_h,
-                hex_to_rgb(colors[idx]),
-                border_color=hex_to_rgb(colors[idx]), border_w=Pt(2), alpha=15000, shadow=True)
+                hex_to_rgb(tokens['colors']['lt1']),
+                border_color=hex_to_rgb(colors[idx]), border_w=Pt(2), shadow=True)
 
         # Full width header within block
         header_h = Inches(0.40)
@@ -900,15 +938,16 @@ def render_swot(slide, element, tokens):
 
 
 def render_cycle(slide, element, tokens):
+    from content_fitter import calculate_fit_font_size
     steps = element.get('steps', [])
     if not steps: return
     n = len(steps)
     center_x = int(MARGIN_L) + int(CONTENT_W / 2)
     center_y = int(CONTENT_TOP) + int(CONTENT_H / 2)
-    radius = min(int(CONTENT_W), int(CONTENT_H)) / 2 - Inches(0.70)
-    node_w = Inches(1.80)
-    node_h = Inches(0.80)
-    colors = [tokens['colors']['accent1'], tokens['colors']['accent2'], tokens['colors']['accent3'],
+    radius = min(int(CONTENT_W), int(CONTENT_H)) / 2 - Inches(1.20)
+    node_w = Inches(2.60)
+    node_h = Inches(1.80)
+    colors = [tokens['colors']['accent1'], tokens['colors']['accent3'], tokens['colors']['accent3'],
               tokens['colors']['accent4'], tokens['colors']['accent5']]
 
     for i, step in enumerate(steps):
@@ -930,9 +969,13 @@ def render_cycle(slide, element, tokens):
         run = p.add_run()
         run.text = step.get('title', '')
         run.font.name = tokens['fonts']['heading']
-        run.font.size = Pt(10)
+        
+        # dynamic fitting
+        fit_title = calculate_fit_font_size(step.get('title',''), node_w/914400, node_h/914400, 11)
+        
+        run.font.size = Pt(fit_title)
         run.font.bold = True
-        run.font.color.rgb = hex_to_rgb(tokens['colors']['lt1'])
+        run.font.color.rgb = hex_to_rgb(tokens['colors']['dk1'])
         p.alignment = PP_ALIGN.CENTER
 
         if step.get('description'):
@@ -940,7 +983,7 @@ def render_cycle(slide, element, tokens):
             r2 = p2.add_run()
             r2.text = step['description']
             r2.font.name = tokens['fonts']['body']
-            r2.font.size = Pt(8)
+            r2.font.size = Pt(max(7, fit_title - 2))
             r2.font.color.rgb = hex_to_rgb(tokens['colors']['lt1'])
             p2.alignment = PP_ALIGN.CENTER
 
@@ -976,7 +1019,7 @@ def render_kpi_cards(slide, element, tokens):
     for i, item in enumerate(items):
         x = int(MARGIN_L) + i * (card_w + int(gap))
         add_card(slide, x, mid_y, card_w, int(card_h),
-                hex_to_rgb(tokens['colors']['lt2']),
+                hex_to_rgb(tokens['colors']['lt1']),
                 hex_to_rgb(tokens['colors']['accent1']), Pt(0))
 
         # Value
@@ -998,7 +1041,7 @@ def render_kpi_cards(slide, element, tokens):
         # Trend
         if item.get('change'):
             arrow = '\u25B2' if item.get('trend') == 'up' else '\u25BC' if item.get('trend') == 'down' else '\u25C6'
-            trend_color = tokens['colors'].get('accent3', tokens['colors'].get('accent6', tokens['colors']['accent2'])) if item.get('trend') == 'up' else tokens['colors']['accent1']
+            trend_color = tokens['colors'].get('accent3', tokens['colors'].get('accent6', tokens['colors']['accent1'])) if item.get('trend') == 'up' else tokens['colors']['accent1']
             add_text_box(slide, x, mid_y + Inches(2.6), card_w, Inches(0.5),
                         f"{arrow} {item['change']}", tokens['fonts']['body'], Pt(14),
                         hex_to_rgb(trend_color), bold=True,
@@ -1014,12 +1057,20 @@ def add_image_placeholder(slide, x, y, w, h, query, tokens, image_url=None, show
             full_test = os.path.normpath(os.path.join(base, img_path))
             if os.path.exists(full_test):
                 try:
-                    slide.shapes.add_picture(full_test, int(x), int(y), int(w), int(h))
+                    pic = slide.shapes.add_picture(full_test, int(x), int(y))
+                    pic_w, pic_h = pic.width, pic.height
+                    if pic_w > 0 and pic_h > 0:
+                        scale = min(w / pic_w, h / pic_h)
+                        pic.width = int(pic_w * scale)
+                        pic.height = int(pic_h * scale)
+                        # Center within the bounding box
+                        pic.left = int(x + (w - pic.width) / 2)
+                        pic.top = int(y + (h - pic.height) / 2)
                     return
                 except Exception:
                     pass
 
-    bg = add_card(slide, x, y, w, h, hex_to_rgb(tokens['colors']['lt2']), hex_to_rgb(tokens['colors']['accent2']), Pt(1), alpha=50000)
+    bg = add_card(slide, x, y, w, h, hex_to_rgb(tokens['colors']['lt1']), hex_to_rgb(tokens['colors']['accent3']), Pt(1), )
     
     if show_icon_text:
         add_text_box(slide, x, y + int(h/2) - Inches(0.4), w, Inches(0.5),
@@ -1081,7 +1132,7 @@ def render_waterfall(slide, element, tokens):
             y = base_y - int(cumulative / max_val * int(CONTENT_H) * 0.4)
 
         fill_color = tokens['colors']['accent1'] if is_total else (
-            tokens['colors'].get('accent3', tokens['colors'].get('accent6', tokens['colors']['accent2'])) if val >= 0 else tokens['colors']['accent1'])
+            tokens['colors'].get('accent3', tokens['colors'].get('accent6', tokens['colors']['accent1'])) if val >= 0 else tokens['colors']['accent1'])
         shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, x, y, bar_w, bar_h)
         shape.fill.solid()
         shape.fill.fore_color.rgb = hex_to_rgb(fill_color)
@@ -1295,22 +1346,40 @@ def compile_presentation(tokens_path, plan_path, template_path, output_path):
 
         # ─── Cover ─────────────────────────────────────────────
         if layout_type == 'cover':
+            from content_fitter import calculate_fit_font_size
             placeholders = sorted(list(slide.placeholders), key=lambda x: x.top)
             if len(placeholders) >= 2:
-                placeholders[0].text = slide_def.get('title', '')
-                for p in placeholders[0].text_frame.paragraphs:
+                ph0 = placeholders[0]
+                ph0.text = slide_def.get('title', '')
+                try:
+                    fit_sz_0 = calculate_fit_font_size(ph0.text, ph0.width/914400, ph0.height/914400, max_font_pt=36) if ph0.width else 36
+                except Exception:
+                    fit_sz_0 = 36
+                for p in ph0.text_frame.paragraphs:
                     p.font.name = tokens['fonts']['heading']
-                    p.font.size = Pt(36)
+                    p.font.size = Pt(fit_sz_0)
                     p.font.bold = True
                     p.font.color.rgb = hex_to_rgb(tokens['colors']['dk1'])
 
-                placeholders[1].text = slide_def.get('subtitle', '')
-                for p in placeholders[1].text_frame.paragraphs:
+                ph1 = placeholders[1]
+                ph1.text = slide_def.get('subtitle', '')
+                try:
+                    fit_sz_1 = calculate_fit_font_size(ph1.text, ph1.width/914400, ph1.height/914400, max_font_pt=14) if ph1.width else 14
+                except Exception:
+                    fit_sz_1 = 14
+                for p in ph1.text_frame.paragraphs:
                     p.font.name = tokens['fonts']['body']
-                    p.font.size = Pt(14)
+                    p.font.size = Pt(fit_sz_1)
                     p.font.color.rgb = hex_to_rgb(tokens['colors']['dk2'])
             elif len(placeholders) == 1:
-                placeholders[0].text = slide_def.get('title', '')
+                ph0 = placeholders[0]
+                ph0.text = slide_def.get('title', '')
+                try:
+                    fit_sz_0 = calculate_fit_font_size(ph0.text, ph0.width/914400, ph0.height/914400, max_font_pt=36) if ph0.width else 36
+                except Exception:
+                    fit_sz_0 = 36
+                for p in ph0.text_frame.paragraphs:
+                    p.font.size = Pt(fit_sz_0)
             continue
 
         # ─── Thank You ─────────────────────────────────────────
@@ -1321,16 +1390,36 @@ def compile_presentation(tokens_path, plan_path, template_path, output_path):
             add_footer(slide, tokens, idx + 1, report_name)
             continue
 
-        # ─── Divider ───────────────────────────────────────────
+                        # ─── Divider ───────────────────────────────────────────
         if layout_type == 'divider':
-            placeholders = list(slide.placeholders)
-            if placeholders:
+            placeholders = sorted(list(slide.placeholders), key=lambda x: x.placeholder_format.idx)
+            if len(placeholders) > 0:
                 placeholders[0].text = slide_def.get('title', '')
                 for p in placeholders[0].text_frame.paragraphs:
                     p.font.name = tokens['fonts']['heading']
-                    p.font.size = Pt(28)
+                    p.font.size = Pt(36)
                     p.font.bold = True
-                    p.font.color.rgb = hex_to_rgb(tokens['colors']['dk1'])
+                    p.alignment = PP_ALIGN.CENTER
+                    # Removed hardcoded font color to inherit the Master Slide's native aesthetic.
+            
+            if slide_def.get('subtitle'):
+                if len(placeholders) > 1:
+                    placeholders[1].text = slide_def.get('subtitle', '')
+                    for p in placeholders[1].text_frame.paragraphs:
+                        p.font.name = tokens['fonts']['body']
+                        p.font.size = Pt(22)
+                        p.alignment = PP_ALIGN.CENTER
+                else:
+                    # Manually inject subtitle below title!
+                    title_top = placeholders[0].top
+                    title_h = placeholders[0].height
+                    sub_y = title_top + title_h + Inches(0.5)
+                    title_left = placeholders[0].left
+                    title_w = placeholders[0].width
+                    add_text_box(slide, title_left, sub_y, title_w, Inches(1.5),
+                        slide_def.get('subtitle', ''), tokens['fonts']['body'], Pt(22), 
+                        hex_to_rgb(tokens['colors']['accent1']), align=PP_ALIGN.CENTER, zero_margin=True)
+                        
             add_footer(slide, tokens, idx + 1, report_name)
             continue
 

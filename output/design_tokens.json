@@ -1,5 +1,5 @@
 {
-  "template_name": "Template_Accenture Tech Acquisition Analysis.pptx",
+  "template_name": "Template_UAE Progress toward 2050 Solar Energy Targets_20250729_120637.pptx",
   "dimensions": {
     "width": 13.33,
     "height": 7.5,
@@ -9,159 +9,165 @@
   "colors": {
     "dk1": "#000000",
     "lt1": "#FFFFFF",
-    "dk2": "#2C2C2C",
-    "lt2": "#E8E8E8",
-    "accent1": "#EF4444",
-    "accent2": "#E97132",
-    "accent3": "#196B24",
-    "accent4": "#0F9ED5",
-    "accent5": "#A02B93",
-    "accent6": "#4EA72E",
-    "hlink": "#467886",
-    "folHlink": "#96607D"
+    "dk2": "#262626",
+    "lt2": "#566C31",
+    "accent1": "#EFF3E5",
+    "accent2": "#33621A",
+    "accent3": "#1A340C",
+    "accent4": "#EFE7C9",
+    "accent5": "#2C5A4F",
+    "accent6": "#8F482C",
+    "hlink": "#283754",
+    "folHlink": "#0097A7"
   },
   "fonts": {
-    "heading": "Libre Baskerville",
-    "body": "Inter"
+    "heading": "Cambria",
+    "body": "Cambria"
   },
   "layouts": [
     {
       "index": 0,
-      "name": "1_Cover",
+      "name": "0_Title Company",
       "placeholders": [
         {
-          "idx": 10,
-          "type": "BODY (2)",
-          "type_clean": "body",
-          "name": "Text Placeholder 12",
-          "x": 0.37,
-          "y": 3.32,
-          "w": 9.29,
-          "h": 0.54
-        },
-        {
-          "idx": 11,
-          "type": "BODY (2)",
-          "type_clean": "body",
-          "name": "Text Placeholder 12",
-          "x": 0.38,
-          "y": 4.41,
-          "w": 9.18,
-          "h": 0.3
+          "idx": 0,
+          "type": "CENTER_TITLE (3)",
+          "type_clean": "title",
+          "name": "Google Shape;14;p2",
+          "x": 2.81,
+          "y": 2.43,
+          "w": 7.71,
+          "h": 2.08
         }
       ],
       "signature": {
-        "body": 2
+        "title": 1
       }
     },
     {
       "index": 1,
-      "name": "2_Cover",
+      "name": "C_Section blue",
       "placeholders": [
         {
-          "idx": 10,
-          "type": "BODY (2)",
-          "type_clean": "body",
-          "name": "Text Placeholder 12",
-          "x": 0.56,
-          "y": 3.19,
-          "w": 12.21,
-          "h": 0.61
-        },
-        {
-          "idx": 11,
-          "type": "BODY (2)",
-          "type_clean": "body",
-          "name": "Text Placeholder 12",
-          "x": 0.56,
-          "y": 4.32,
-          "w": 12.21,
-          "h": 0.67
+          "idx": 0,
+          "type": "CENTER_TITLE (3)",
+          "type_clean": "title",
+          "name": "Google Shape;76;p10",
+          "x": 0.43,
+          "y": 1.8,
+          "w": 9.31,
+          "h": 1.07
         }
       ],
       "signature": {
-        "body": 2
+        "title": 1
       }
     },
     {
       "index": 2,
-      "name": "Divider",
-      "placeholders": [
-        {
-          "idx": 10,
-          "type": "BODY (2)",
-          "type_clean": "body",
-          "name": "Text Placeholder 12",
-          "x": 0.58,
-          "y": 3.51,
-          "w": 12.18,
-          "h": 0.47
-        }
-      ],
-      "signature": {
-        "body": 1
-      }
-    },
-    {
-      "index": 3,
-      "name": "Blank",
-      "placeholders": [],
-      "signature": {}
-    },
-    {
-      "index": 4,
-      "name": "Title only",
+      "name": "1_E_Title, Subtitle and Body",
       "placeholders": [
         {
           "idx": 0,
           "type": "TITLE (1)",
           "type_clean": "title",
-          "name": "Title 1",
-          "x": 0.38,
-          "y": 0.66,
-          "w": 11.58,
-          "h": 0.58
+          "name": "Google Shape;92;p14",
+          "x": 0.43,
+          "y": 0.42,
+          "w": 12.47,
+          "h": 0.62
+        },
+        {
+          "idx": 2,
+          "type": "SUBTITLE (4)",
+          "type_clean": "subtitle",
+          "name": "Google Shape;93;p14",
+          "x": 0.43,
+          "y": 1.12,
+          "w": 12.47,
+          "h": 0.2
         },
         {
           "idx": 11,
-          "type": "OBJECT (7)",
+          "type": "BODY (2)",
           "type_clean": "body",
-          "name": "Content Placeholder 8",
-          "x": 0.38,
-          "y": 7.23,
-          "w": 3.23,
+          "name": "Text Placeholder 4",
+          "x": 0.43,
+          "y": 6.74,
+          "w": 12.47,
           "h": 0.13
         },
         {
           "idx": 4,
           "type": "SLIDE_NUMBER (13)",
           "type_clean": "slide_number",
-          "name": "Slide Number Placeholder 3",
-          "x": 9.94,
-          "y": 7.23,
-          "w": 3.0,
-          "h": 0.13
+          "name": "Google Shape;7;p1",
+          "x": 12.68,
+          "y": 6.94,
+          "w": 0.28,
+          "h": 0.25
         }
       ],
       "signature": {
         "title": 1,
+        "subtitle": 1,
         "body": 1,
         "slide_number": 1
       }
     },
     {
-      "index": 5,
-      "name": "Thank You",
-      "placeholders": [],
-      "signature": {}
+      "index": 3,
+      "name": "1_E_Title, Subtitle and Body",
+      "placeholders": [
+        {
+          "idx": 11,
+          "type": "BODY (2)",
+          "type_clean": "body",
+          "name": "Text Placeholder 4",
+          "x": 0.43,
+          "y": 6.74,
+          "w": 12.47,
+          "h": 0.13
+        },
+        {
+          "idx": 4,
+          "type": "SLIDE_NUMBER (13)",
+          "type_clean": "slide_number",
+          "name": "Google Shape;7;p1",
+          "x": 12.68,
+          "y": 6.94,
+          "w": 0.28,
+          "h": 0.25
+        }
+      ],
+      "signature": {
+        "body": 1,
+        "slide_number": 1
+      }
+    },
+    {
+      "index": 4,
+      "name": "1_E_Title, Subtitle and Body",
+      "placeholders": [
+        {
+          "idx": 4,
+          "type": "SLIDE_NUMBER (13)",
+          "type_clean": "slide_number",
+          "name": "Google Shape;7;p1",
+          "x": 12.68,
+          "y": 6.94,
+          "w": 0.28,
+          "h": 0.25
+        }
+      ],
+      "signature": {
+        "slide_number": 1
+      }
     }
   ],
   "backgrounds": {
-    "1_Cover": "assets/bg_1_cover.png",
-    "2_Cover": "assets/bg_2_cover.png",
-    "Divider": "assets/bg_divider.png",
-    "Blank": "assets/bg_blank.png",
-    "Title only": "assets/bg_title_only.png",
-    "Thank You": "assets/bg_thank_you.png"
+    "0_Title Company": "assets/bg_0_title_company.png",
+    "C_Section blue": "assets/bg_c_section_blue.png",
+    "1_E_Title, Subtitle and Body": "assets/bg_1_e_title,_subtitle_and_body.png"
   }
 }

@@ -21,10 +21,11 @@ load_dotenv()
 
 # Import pipeline stages
 from ingest import ingest as run_ingest
-from orchestrator import plan_presentation as run_orchestrate
+# Deferred import for orchestrator to avoid genai dependency locally
 from compiler import compile_presentation as run_compile
 from validator import validate_presentation, print_validation_report
 from editor import get_inventory, print_inventory, replace_text, reorder_slides
+from auto_fixer import run_fixes
 
 
 # ─── Full Pipeline ────────────────────────────────────────────────────────────
@@ -47,6 +48,7 @@ def generate_presentation(markdown_path: str, template_path: str, output_path: s
     print("STAGE 2: ORCHESTRATION")
     print("=" * 60)
     plan_path = os.path.join(output_dir, "ui_plan.json")
+    from orchestrator import plan_presentation as run_orchestrate
     run_orchestrate(markdown_path, tokens_path, plan_path, api_key)
 
     # Stage 3: Compile (now using python-pptx with native template)
@@ -55,9 +57,15 @@ def generate_presentation(markdown_path: str, template_path: str, output_path: s
     print("=" * 60)
     run_compile(tokens_path, plan_path, template_path, output_path)
 
-    # Stage 4: Validate
+    # Stage 4: Auto-Fixer
     print("\n" + "=" * 60)
-    print("STAGE 4: VALIDATION")
+    print("STAGE 4: AUTO-FIXING")
+    print("=" * 60)
+    output_path = run_fixes(output_path, None, output_path)
+
+    # Stage 5: Validate
+    print("\n" + "=" * 60)
+    print("STAGE 5: VALIDATION")
     print("=" * 60)
     
     with open(tokens_path, 'r', encoding='utf-8') as f:
@@ -190,10 +198,15 @@ Examples:
         run_ingest(args.template, args.output)
 
     elif args.command == "plan":
+        from orchestrator import plan_presentation as run_orchestrate
         run_orchestrate(args.markdown, args.tokens, args.output, args.api_key)
 
     elif args.command == "compile":
         run_compile(args.tokens, args.plan, args.template, args.output)
+        
+        # Auto-fix before validating
+        run_fixes(args.output, None, args.output)
+        
         if not args.no_validate:
             import json
             with open(args.tokens, 'r', encoding='utf-8') as f:
